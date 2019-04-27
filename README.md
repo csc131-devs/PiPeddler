@@ -1,1 +1,3 @@
-# PiPeddler
+# PiPedaler
+
+Just keep pedaling.
