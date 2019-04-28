@@ -40,15 +40,15 @@ with open('../data/songlist.txt') as songlist:
 class GUI(Frame):
     def __init__(self, master):
         Frame.__init__(self, master)
-        #self.master = master
-        
+        self.master=master
+
         # prev/next song cycle button setup
-        self.button1 = Button(self.master, text="-->", fg="blue", command=self.next_song(current_index), height=10, width=10)
-        #self.button1.bind("<1>", self.next_song(current_index))
+        self.button1 = Button(self.master, text="-->", fg="blue", command=self.prev_song,\
+                              height=10, width=10)
         self.button1.pack(side=RIGHT)
 
-        self.button2 = Button(self.master, text="<--", fg="blue", command=self.prev_song(current_index), height=10, width=10)
-        #self.button2.bind("<1>", self.prev_song(current_index))
+        self.button2 = Button(self.master, text="<--", fg="blue", command=self.next_song,\
+                              height=10, width=10)
         self.button2.pack(side=RIGHT)
 
         # setup the user input at the bottom of the GUI
@@ -99,8 +99,8 @@ class GUI(Frame):
 
         self.text.config(state=DISABLED)
 
-    # process typed user input
-    def process(self, event):
+    # process user input
+    def process(self):
         query = self.user_input.get()
         query = query.lower()
 
@@ -111,19 +111,17 @@ class GUI(Frame):
         # concatenate appropriate title and BPM output
         if(songDictionary.get(query)):
             response = "Title: " + query + "\n" + "BPM: " + songDictionary[query]
-        #print response
+
         # send response to setStatus method for printing
         # clear the player's input
         self.setStatus(response)
         self.user_input.delete(0, END)
 
-    # cycle to previous song
-    def prev_song(self, current_index):
-        print "prev_song"
-        print "current_index: {}".format(current_index)
+    def prev_song(self):
+        global current_index
         current_index = current_index - 1
 
-        if ( current_index < 0 ):
+        if ( (current_index) < 0 ):
             current_index = len(songList)-1
 
         current_song = songList[current_index]
@@ -132,19 +130,17 @@ class GUI(Frame):
         # concatenate appropriate title and BPM output
         if(songDictionary.get(current_song)):
             response = "Title: " + current_song + "\n" + "BPM: " + songDictionary[current_song]
-        #print response
+        
         # display the response on the right of the GUI
         # clear the player's input
-##        self.setStatus(response)
-##        self.user_input.delete(0, END)
-
-    # cycle to next song        
-    def next_song(self, current_index):
-        print "next_song"
-        print "current_index: {}".format(current_index)
+        self.setStatus(response)
+        self.user_input.delete(0, END)
+            
+    def next_song(self):
+        global current_index
         current_index = current_index + 1 
 
-        if ( current_index  > len(songList)-1 ):
+        if ( (current_index ) > len(songList)-1 ):
             current_index = 0
 
         current_song = songList[current_index]
@@ -153,11 +149,11 @@ class GUI(Frame):
         # concatenate appropriate title and BPM output
         if(songDictionary.get(current_song)):
             response = "Title: " + current_song + "\n" + "BPM: " + songDictionary[current_song]
-        print response
+
         # display the response on the right of the GUI
         # clear the player's input
-##        self.setStatus(response)
-##        self.user_input.delete(0, END)
+        self.setStatus(response)
+        self.user_input.delete(0, END)
         
 ############################################################################################
 # MAIN
@@ -175,4 +171,3 @@ g = GUI(window)
 
 # Wait for the window to close
 window.mainloop()
-print "hello"
