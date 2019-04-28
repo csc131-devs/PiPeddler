@@ -26,7 +26,7 @@ current_index = 0
 # parse file object, set string to lowercase,
 # strip outside whitespace, add to dictionary,
 # append to list
-with open('songlist.txt') as songlist:
+with open('../data/songlist.txt') as songlist:
     for line in songlist:
         line = line.split('-')
         song = line[0].strip()
