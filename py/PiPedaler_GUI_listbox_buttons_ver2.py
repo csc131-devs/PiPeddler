@@ -66,13 +66,15 @@ class GUI(Frame):
         self.listbox = Listbox(master,font=('Courier', 16), selectmode=SINGLE, exportselection=0)
         self.listbox.grid(row=0, rowspan=3, column=0, pady=3, sticky=N+S+E+W)
         self.index = 0
+
         # populate songs in listbox
         for i in range(len(songList)):
             self.listbox.insert(END, songList[i])
+
         # highlight index 0
         self.listbox.select_set(current_index)
     
-        # prev/next song cycle button setup
+        # prev/next song cycle buttons setup
         self.button2 = Button(self.master, text="-->", fg="blue", command=self.next_song,\
                               font=('Courier',40))
         self.button2.grid(row=2, column=2, sticky=N+S+E+W)
@@ -129,7 +131,7 @@ class GUI(Frame):
     def update_bpm(self, bpm):
         global current_bpm
         current_bpm = bpm
-        self.CBPM.configure(text="Current BPM: {}".format(current_bpm)) #fg="red"
+        self.CBPM.configure(text="Current BPM: {}".format(current_bpm),fg="red")
         
 ############################################################################################
 # MAIN
