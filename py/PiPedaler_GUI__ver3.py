@@ -12,29 +12,32 @@ from Tkinter import *
 #import RPi.GPIO as GPIO, time
 from time import clock
 #from guiLoop import guiLoop ## https://gist.github.com/niccokunzmann/8673951
+import serial
+from os import system
+from sys import version_info
 
-### switch is connected to 23
-##switch = 23
-##
-### setup GPIO
-##GPIO.setmode(GPIO.BCM)
-##GPIO.setwarnings(False)
-##GPIO.setup(switch,GPIO.IN)
+PYTHON3 = version_info[0] >= 3	# Hacks
 
+class Translator(serial.Serial):
+	def __init__(self):
+#		system("sudo stty -F /dev/ttyS0 9600")	# Force the baud rate
+		system("sudo systemctl stop serial-getty@ttyS0.service")
+		if PYTHON3:
+			return super().__init__("/dev/ttyS0")
+                return super(Translator, self).__init__("/dev/ttyS0")
 
-# .txt file must be formatted as: "SongName-BPM"
-# One song per line maximum
-# parser will deal with all capitals and space
-# Hyphen '-' required for parsing
+# switch is connected to 23
+switch = 23
 
-# songList list
-songList = []
+# setup GPIO
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+GPIO.setup(switch,GPIO.IN)
 
-# global index variable for click button song rotation
+# GLOBAL VARIABLES for list index and BPM
 global current_index
 current_index = 0
 
-# global variable for current BPM
 global current_bpm
 current_bpm = 0
 
@@ -46,10 +49,16 @@ class Song():
         self.bigsky = bigsky
         self.boomerang = boomerang
 
-        
+# songList list
+songList = []
+
+# .txt file must be formatted as: "SongName-BPM"
+# One song per line maximum
+# parser will split line into component parts
+# Hyphen '-' required for parsing
+
 # open text file with songs and BPMs
-# parse file object, set string to lowercase,
-# strip outside whitespace, add to dictionary,
+# parse file object, strip outside whitespace,
 # append to list
 def songDatabase():
     with open('songlist.txt') as songlist:
@@ -155,24 +164,24 @@ window = Tk()
 g = GUI(window)
 
 # Wait for the window to close
-window.mainloop()
+#window.mainloop()
 
-### infinite loop listening for user input
-##while 1:
-##    window.update()
-##    b = GPIO.input(switch) # button state
-##    if(b == GPIO.HIGH):
-##        t1 = t2
-##        t2 = time.clock()
-##        diff = t2 - t1
-##        
-##    if (t1!=0 and diff <= 1.5 and diff >= 0.24): # between 40 and 250 bpm 
-##        tempo = 60/diff
-##        print round(tempo,2), 'BPM'
-##        freq = 1 / diff
-##        #pwm.ChangeFrequency(freq)
-##            
-##                 
-##    elif (b == GPIO.LOW and N == 3):
-##        N = 0
+# infinite loop listening for user input
+while 1:
+    window.update()
+    b = GPIO.input(switch) # button state
+    if(b == GPIO.HIGH):
+        t1 = t2
+        t2 = time.clock()
+        diff = t2 - t1
+        
+    if (t1!=0 and diff <= 1.5 and diff >= 0.24): # between 40 and 250 bpm 
+        tempo = 60/diff
+        print round(tempo,2), 'BPM'
+        freq = 1 / diff
+        #pwm.ChangeFrequency(freq)
+        g.update_bpm(tempo)            
+                 
+    elif (b == GPIO.LOW and N == 3):
+        N = 0
 
