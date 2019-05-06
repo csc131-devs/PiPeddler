@@ -9,37 +9,34 @@
 # DEVELOPED BY: David Love, John Mascagni, Tony Roberts           
 ############################################################################################################################################################################################
 from Tkinter import *
-#import RPi.GPIO as GPIO, time
+import RPi.GPIO as GPIO, time
 from time import clock
-#from guiLoop import guiLoop ## https://gist.github.com/niccokunzmann/8673951
 import serial
 from os import system
 from sys import version_info
 
-PYTHON3 = version_info[0] >= 3	# Hacks
-
 class Translator(serial.Serial):
-	def __init__(self):
-#		system("sudo stty -F /dev/ttyS0 9600")	# Force the baud rate
-		system("sudo systemctl stop serial-getty@ttyS0.service")
-		if PYTHON3:
-			return super().__init__("/dev/ttyS0")
+        def __init__(self):
+                system("sudo systemctl stop serial-getty@ttyS0.service")
                 return super(Translator, self).__init__("/dev/ttyS0")
 
-# switch is connected to 23
-switch = 23
+# set values for switches
+tap = 23
+nextSong = 24
+lastSong = 25
+womb = 27
 
 # setup GPIO
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-GPIO.setup(switch,GPIO.IN)
+GPIO.setup(tap, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(nextSong, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(lastSong, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(womb, GPIO.OUT)
 
 # GLOBAL VARIABLES for list index and BPM
-global current_index
+#global current_index
 current_index = 0
-
-global current_bpm
-current_bpm = 0
 
 # Song class
 class Song():
@@ -65,7 +62,7 @@ def songDatabase():
         for line in songlist:
             line = line.split('-')
             song = line[0].strip()
-            bpm = line[1].strip()
+            bpm = float(line[1].strip())
             bigsky = line[2].strip()
             boomerang = line[3].strip()
 
@@ -78,12 +75,17 @@ class GUI(Frame):
     def __init__(self, master):
         Frame.__init__(self, master)
         self.master=master
- 
+        self.lastTime = 0.0
+        self.bpmFlags = 0
+        self.currentbpm = 0
+       
+               
         # create and populate list box on left side of GUI
         self.listbox = Listbox(master,width=25, height=10, font=('Courier', 16), selectmode=SINGLE, exportselection=0)
         self.listbox.grid(row=0, rowspan=3, column=0, pady=3, sticky=N+S+E+W)
         self.index = 0
-
+                
+                
         # populate songs in listbox
         for i in range(len(songList)):
             self.listbox.insert(END, songList[i].song)
@@ -109,7 +111,7 @@ class GUI(Frame):
         # Current BPM box
         self.CBPM = Label(self.master, text="Current BPM: {}".format(songList[current_index].bpm), font=('Courier',24))
         self.CBPM.grid(row=1, column=1, columnspan=2, sticky=N+S+E+W)
-
+ 
     # previous song method
     def prev_song(self): 
         self.listbox.select_clear(current_index)
@@ -123,9 +125,8 @@ class GUI(Frame):
 
         # updates current BPM box        
         self.listbox.select_set(current_index)
-        global current_bpm
-        current_bpm = songList[current_index].bpm
-        self.CBPM.configure(text="Current BPM: {}".format(current_bpm))
+        self.setFlags(songList[current_index].bpm)
+        self.CBPM.configure(text="Current BPM: {}".format(self.currentbpm), fg="black")
         
     # next song method        
     def next_song(self):
@@ -140,16 +141,49 @@ class GUI(Frame):
 
         # updates current BPM box        
         self.listbox.select_set(current_index)
-        global current_bpm
-        current_bpm = songList[current_index].bpm
-        self.CBPM.configure(text="Current BPM: {}".format(current_bpm))
+        self.setFlags(songList[current_index].bpm)
+        self.CBPM.configure(text="Current BPM: {}".format(self.currentbpm), fg="black")
 
     # update current BPM from pedal taps
     def update_bpm(self, bpm):
-        global current_bpm
-        current_bpm = bpm
-        self.CBPM.configure(text="Current BPM: {}".format(current_bpm),fg="red")
+        self.setFlags(bpm)
+        self.CBPM.configure(text="Current BPM: {}".format(self.currentbpm),fg="red")
+
+    def setFlags(self, value):
+        self.currentbpm = value
+        self.setBPM(True)
+
+    def setBPM(self, override = False):  # Transistor, I/O values are flipped
+        currtime = time.clock()
+        if override:    # Destroy everything
+                self.bpmFlags |= 1 << 0
+                GPIO.output(womb, GPIO.LOW)
+                self.lastTime = currtime + 0.1
+                return
         
+        if currtime < self.lastTime:
+                return
+
+        if self.bpmFlags & 1 << 0:
+                GPIO.output(womb, GPIO.HIGH)
+                self.bpmFlags |= 1 << 1
+                self.bpmFlags &= ~1 << 0
+                delay = 60.0/self.currentbpm
+                print delay
+                self.lastTime = currtime + delay
+
+        if self.bpmFlags & 1 << 1:
+                GPIO.output(womb, GPIO.LOW)
+                self.bpmFlags |= 1 << 2
+                self.bpmFlags &= ~1 << 1
+                self.lastTime = currtime + 0.1
+
+        if self.bpmFlags & 1 << 2:
+                GPIO.output(womb, GPIO.HIGH)
+                self.bpmFlags = 0
+                self.lastTime = 99999999
+                
+            
 #########################################################################################################
 # MAIN
 #########################################################################################################s
@@ -166,22 +200,55 @@ g = GUI(window)
 # Wait for the window to close
 #window.mainloop()
 
-# infinite loop listening for user input
-while 1:
-    window.update()
-    b = GPIO.input(switch) # button state
-    if(b == GPIO.HIGH):
-        t1 = t2
-        t2 = time.clock()
-        diff = t2 - t1
+
+debounce = 0
+bpmtoggle = False
+bpmlast = 0
+lastNextSong=0
+lastPrevSong=0
+try:
         
-    if (t1!=0 and diff <= 1.5 and diff >= 0.24): # between 40 and 250 bpm 
-        tempo = 60/diff
-        print round(tempo,2), 'BPM'
-        freq = 1 / diff
-        #pwm.ChangeFrequency(freq)
-        g.update_bpm(tempo)            
-                 
-    elif (b == GPIO.LOW and N == 3):
-        N = 0
+        # infinite loop listening for user input
+        while 1:
+                g.setBPM()
+                window.update()
+                b = GPIO.input(tap) # button state
+                c = GPIO.input(nextSong) # button state
+                d = GPIO.input(lastSong) # button state
+                if(b == GPIO.HIGH and not bpmtoggle):
+                        bpmtoggle = True
+                        currbpm = time.clock()
+                        
+                        diff = currbpm - bpmlast
+                        if(diff > 0.24):
+                                
+                                if(0.24 <= diff <= 1.5):
+                                        tempo = 60/diff
+                                        #print round(tempo,2), 'BPM'
+                                        freq = 1 / diff
+                                        #pwm.ChangeFrequency(freq)
+                                        g.update_bpm((round(tempo,2)))
+
+                                bpmlast = currbpm
+
+                elif (b == GPIO.LOW and bpmtoggle):
+                        bpmtoggle = False
+                                                         
+                if(c == GPIO.HIGH and lastNextSong == 0):
+                        g.next_song()
+                        lastNextSong=1
+
+                elif(c == GPIO.LOW and lastNextSong == 1):
+                        lastNextSong=0
+
+                elif(d == GPIO.HIGH and lastPrevSong == 0):
+                        g.prev_song()
+                        lastPrevSong=1
+
+                elif(d == GPIO.LOW and lastPrevSong == 1):
+                        lastPrevSong=0
+                
+except KeyboardInterrupt:
+        GPIO.cleanup()
+
 
