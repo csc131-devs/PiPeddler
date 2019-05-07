@@ -182,7 +182,11 @@ class GUI(Frame):
                 GPIO.output(womb, GPIO.HIGH)
                 self.bpmFlags = 0
                 self.lastTime = 99999999
-                
+    
+ #    def strCat(self, song):
+ #      str = ""
+ #      str = song.name + song.bpm + song.bigsky + song.boomerang
+ #      return str
             
 #########################################################################################################
 # MAIN
