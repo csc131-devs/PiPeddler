@@ -40,11 +40,12 @@ current_index = 0
 
 # Song class
 class Song():
-    def __init__(self, song, bpm, bigsky, boomerang):
+    def __init__(self, song, bpm, timeline, bigsky):
         self.song = song
         self.bpm = bpm
+        self.timeline = timeline
         self.bigsky = bigsky
-        self.boomerang = boomerang
+        
 
 # songList list
 songList = []
@@ -185,7 +186,7 @@ class GUI(Frame):
     
  #    def strCat(self, song):
  #      str = ""
- #      str = song.name + song.bpm + song.bigsky + song.boomerang
+ #      str = song.name + song.bpm + song.timeline + song.bigsky
  #      return str
             
 #########################################################################################################
