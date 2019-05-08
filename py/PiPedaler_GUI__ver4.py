@@ -18,14 +18,16 @@ from sys import version_info
 class Translator(serial.Serial):
         def __init__(self):
                 system("sudo systemctl stop serial-getty@ttyS0.service")
-                return super(Translator, self).__
-        init__("/dev/ttyS0")
+                return super(Translator, self).__init__("/dev/ttyS0")
 
 # set values for switches
 tap = 23
 nextSong = 24
 lastSong = 25
 womb = 27
+
+
+
 
 # setup GPIO
 GPIO.setmode(GPIO.BCM)
@@ -35,17 +37,18 @@ GPIO.setup(nextSong, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(lastSong, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(womb, GPIO.OUT)
 
+
 # GLOBAL VARIABLES for list index and BPM
 #global current_index
 current_index = 0
 
 # Song class
 class Song():
-    def __init__(self, song, bpm, bigsky, boomerang):
+    def __init__(self, song, bpm, timeline, bigsky):
         self.song = song
         self.bpm = bpm
+        self.timeline = timeline
         self.bigsky = bigsky
-        self.boomerang = boomerang
 
 # songList list
 songList = []
@@ -64,10 +67,10 @@ def songDatabase():
             line = line.split('-')
             song = line[0].strip()
             bpm = float(line[1].strip())
-            bigsky = line[2].strip()
-            boomerang = line[3].strip()
+            timeline = line[2].strip()
+            bigsky = line[3].strip()
 
-            song = Song(song, bpm, bigsky, boomerang)
+            song = Song(song, bpm, timeline, bigsky)
 
             songList.append(song)
         
@@ -77,8 +80,7 @@ class GUI(Frame):
         Frame.__init__(self, master)
         self.master=master
         self.lastTime = 0.0
-        self.bpmFlags = 0
-        self.currentbpm = 0
+        self.currentbpm = 120
         master.attributes("-fullscreen",True)       
 
         Grid.rowconfigure(master, 0, weight=1)
@@ -114,6 +116,10 @@ class GUI(Frame):
         # Current BPM box
         self.CBPM = Label(self.master, height=3, text="Current BPM: {}".format(songList[current_index].bpm), font=('Courier',24))
         self.CBPM.grid(row=1, column=1, columnspan=2, sticky=N+S+E+W)
+
+        
+        pwm.ChangeFrequency(1/(60.0/self.currentbpm))
+        self.serialize()
  
     # previous song method
     def prev_song(self): 
@@ -127,9 +133,11 @@ class GUI(Frame):
             current_index = len(songList)-1
 
         # updates current BPM box        
-        self.listbox.select_set(current_index)
-        self.setFlags(songList[current_index].bpm)
+        self.listbox.select_set(current_index) 
+        self.currentbpm=(songList[current_index].bpm)
+        pwm.ChangeFrequency(1/(60.0/self.currentbpm))
         self.CBPM.configure(text="Current BPM: {}".format(self.currentbpm), fg="black")
+        self.serialize()
         
     # next song method        
     def next_song(self):
@@ -144,47 +152,27 @@ class GUI(Frame):
 
         # updates current BPM box        
         self.listbox.select_set(current_index)
-        self.setFlags(songList[current_index].bpm)
+        self.currentbpm=(songList[current_index].bpm)
+        pwm.ChangeFrequency(1/(60.0/self.currentbpm))
         self.CBPM.configure(text="Current BPM: {}".format(self.currentbpm), fg="black")
+        self.serialize()
 
     # update current BPM from pedal taps
     def update_bpm(self, bpm):
-        self.setFlags(bpm)
+        self.currentbpm=(bpm)
+        pwm.ChangeFrequency(1/(60.0/bpm))
         self.CBPM.configure(text="Current BPM: {}".format(self.currentbpm),fg="red")
+        self.serialize()
 
-    def setFlags(self, value):
-        self.currentbpm = value
-        self.setBPM(True)
-
-    def setBPM(self, override = False):  # Transistor, I/O values are flipped
-        currtime = time.clock()
-        if override:    # Destroy everything
-                self.bpmFlags |= 1 << 0
-                GPIO.output(womb, GPIO.LOW)
-                self.lastTime = currtime + 0.1
-                return
+    def serialize(self):
+        global current_index
+        t.write("{},{},{},{}".format(songList[current_index].song, self.currentbpm,\
+            songList[current_index].timeline, songList[current_index].bigsky))
+            
         
-        if currtime < self.lastTime:
-                return
-
-        if self.bpmFlags & 1 << 0:
-                GPIO.output(womb, GPIO.HIGH)
-                self.bpmFlags |= 1 << 1
-                self.bpmFlags &= ~1 << 0
-                delay = 60.0/self.currentbpm
-                print delay
-                self.lastTime = currtime + delay
-
-        if self.bpmFlags & 1 << 1:
-                GPIO.output(womb, GPIO.LOW)
-                self.bpmFlags |= 1 << 2
-                self.bpmFlags &= ~1 << 1
-                self.lastTime = currtime + 0.1
-
-        if self.bpmFlags & 1 << 2:
-                GPIO.output(womb, GPIO.HIGH)
-                self.bpmFlags = 0
-                self.lastTime = 99999999
+ #    def strCat(self, song):
+ #      str = "<{},{},{},{}>\n".format(song.name, song.bpm, song.timeline, song.bigsky)
+ #      return str
                 
             
 #########################################################################################################
@@ -197,14 +185,20 @@ songDatabase()
 window = Tk()
 #window.title("Pi Pedaler")
 
+pwm = GPIO.PWM(womb, 2)
+pwm.start(90)
+
+# Initialize translator
+t = Translator()
+
 # Create the GUI as a TKinter canvas inside the window
 g = GUI(window)
+
 
 # Wait for the window to close
 #window.mainloop()
 
 
-debounce = 0
 bpmtoggle = False
 bpmlast = 0
 lastNextSong=0
@@ -213,7 +207,6 @@ try:
         
         # infinite loop listening for user input
         while 1:
-                g.setBPM()
                 window.update()
                 b = GPIO.input(tap) # button state
                 c = GPIO.input(nextSong) # button state
@@ -228,8 +221,6 @@ try:
                                 if(0.24 <= diff <= 1.5):
                                         tempo = 60/diff
                                         #print round(tempo,2), 'BPM'
-                                        freq = 1 / diff
-                                        #pwm.ChangeFrequency(freq)
                                         g.update_bpm((round(tempo,2)))
 
                                 bpmlast = currbpm
