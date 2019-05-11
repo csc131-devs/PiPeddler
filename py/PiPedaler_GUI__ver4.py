@@ -15,6 +15,7 @@ import serial
 from os import system
 from sys import version_info
 
+
 class Translator(serial.Serial):
         def __init__(self):
                 system("sudo systemctl stop serial-getty@ttyS0.service")
@@ -26,6 +27,8 @@ nextSong = 24
 lastSong = 25
 womb = 27
 
+# set pins for serial enable
+enable = 12
 
 
 
@@ -36,6 +39,7 @@ GPIO.setup(tap, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(nextSong, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(lastSong, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(womb, GPIO.OUT)
+GPIO.setup(enable, GPIO.OUT)
 
 
 # GLOBAL VARIABLES for list index and BPM
@@ -66,7 +70,7 @@ def songDatabase():
         for line in songlist:
             line = line.split('-')
             song = line[0].strip()
-            bpm = float(line[1].strip())
+            bpm = int(line[1].strip())
             timeline = line[2].strip()
             bigsky = line[3].strip()
 
@@ -87,7 +91,7 @@ class GUI(Frame):
         Grid.columnconfigure(master, 0, weight=1)
                
         # create and populate list box on left side of GUI
-        self.listbox = Listbox(master,width=25, height=10, font=('Courier', 16), selectmode=SINGLE, exportselection=0)
+        self.listbox = Listbox(master,width=25, height=10, font=('Courier', 16), bg="black", fg="white",selectmode=SINGLE, exportselection=0)
         self.listbox.grid(row=0, rowspan=3, column=0, pady=3, sticky=N+S+E+W)
         self.index = 0
                 
@@ -99,16 +103,16 @@ class GUI(Frame):
         self.listbox.select_set(current_index)
     
         # prev/next song cycle buttons setup
-        self.button2 = Button(self.master, height=3, text="-->", fg="blue", command=self.next_song,\
+        self.button2 = Button(self.master, height=3, text="-->", bg="black", fg="blue", command=self.next_song,\
                               font=('Courier',40))
         self.button2.grid(row=2, column=2, sticky=N+S+E+W)
 
-        self.button1 = Button(self.master, height=3, text="<--", fg="blue", command=self.prev_song,\
+        self.button1 = Button(self.master, height=3, text="<--", bg="black", fg="blue", command=self.prev_song,\
                               font=('Courier',40))
         self.button1.grid(row=2, column=1, sticky=N+S+E+W)
 
         # place PiPedaler ascii art in top right of UI
-        self.img = PhotoImage(file="PiPedaler_gif.gif")
+        self.img = PhotoImage(file="PiPedaler.gif")
         pipedaler_img = Label(image=self.img)
         pipedaler_img.image = self.img
         pipedaler_img.grid(row=0, column=1, columnspan=2, sticky=N+S+E+W)
@@ -169,10 +173,6 @@ class GUI(Frame):
         t.write("{},{},{},{}".format(songList[current_index].song, self.currentbpm,\
             songList[current_index].timeline, songList[current_index].bigsky))
             
-        
- #    def strCat(self, song):
- #      str = "<{},{},{},{}>\n".format(song.name, song.bpm, song.timeline, song.bigsky)
- #      return str
                 
             
 #########################################################################################################
@@ -187,6 +187,10 @@ window = Tk()
 
 pwm = GPIO.PWM(womb, 2)
 pwm.start(90)
+
+# enable tx and rx pins
+GPIO.output(enable, GPIO.HIGH)
+
 
 # Initialize translator
 t = Translator()
@@ -220,8 +224,7 @@ try:
                                 
                                 if(0.24 <= diff <= 1.5):
                                         tempo = 60/diff
-                                        #print round(tempo,2), 'BPM'
-                                        g.update_bpm((round(tempo,2)))
+                                        g.update_bpm(int((round(tempo))))
 
                                 bpmlast = currbpm
 
