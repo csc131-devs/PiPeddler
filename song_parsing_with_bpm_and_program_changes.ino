@@ -4,10 +4,13 @@ const byte numChars = 32;
 char receivedChars[numChars];
 char tempChars[numChars];        // temporary array for use when parsing
 
-// variables to hold the parsed data
+// constants won't change. They're used here to set pin numbers:
+const int startPedaling = 3;     // pin number for the enabling serial connection
+
+// variables
 char Song[numChars] = {0};
-float BPM = 120;
-float newBPM = 0;
+float BPM = 100;
+float newBPM = 120;
 int TimeLine = 0;
 int newTimeLine = 0;
 int BigSky = 0;
@@ -15,8 +18,12 @@ int newBigSky = 0;
 unsigned long PERIOD;         // microseconds, setting Timer1
 char tempString[10]; // for sprintf
 char songstuff[4][32];
+int programStarted = 0;
+boolean serialEnabled = false; 
 
 boolean newData = false;
+
+
 
 void MIDI_CLOCK() // ISR: send MIDI CLock
 {
@@ -98,9 +105,8 @@ void setup() {
 
     PERIOD = 2.5e6 / BPM;  // period in microseconds, 24x beat clock
     Timer1.initialize(PERIOD);
-    Timer1.attachInterrupt( MIDI_CLOCK ); // set interrupt handler
-    Serial2.begin(9600);
-    Serial2.setTimeout(200);
+    //Timer1.attachInterrupt( MIDI_CLOCK ); // set interrupt handle
+    pinMode(startPedaling, INPUT);
 }
 
 
@@ -116,6 +122,17 @@ void loop() {
         //MIDI_CLOCK();
         //lasttime = currtime;
      //}
+     
+    if ((programStarted == LOW)){
+      programStarted = digitalRead(startPedaling);    
+     }
+
+
+     if ((programStarted == HIGH) && (serialEnabled == false)){
+          Serial2.begin(9600);
+          Serial2.setTimeout(200);
+          serialEnabled = true;
+     }
 
      int len = Serial2.available();
      if (len){
@@ -155,70 +172,4 @@ void loop() {
         setNewTimeLine();
         setNewBigSky();
      }
-}
-
-//============
-
-void recvWithStartEndMarkers() {
-    static boolean recvInProgress = false;
-    static byte ndx = 0;
-    char startMarker = '<';
-    char endMarker = '>';
-    char rc;
-
-    while (Serial2.available() > 0 && newData == false) {
-        rc = Serial2.read();
-
-        if (recvInProgress == true) {
-            if (rc != endMarker) {
-                receivedChars[ndx] = rc;
-                ndx++;
-                if (ndx >= numChars) {
-                    ndx = numChars - 1;
-                }
-            }
-            else {
-                receivedChars[ndx] = '\0'; // terminate the string
-                recvInProgress = false;
-                ndx = 0;
-                newData = true;
-            }
-        }
-
-        else if (rc == startMarker) {
-            recvInProgress = true;
-        }
-    }
-}
-
-//============
-
-void parseData() {      // split the data into its parts
-
-    char * strtokIndx; // this is used by strtok() as an index
-    
-    strtokIndx = strtok(tempChars,",");      // get the first part - the string
-    strcpy(Song, strtokIndx);          // copy it to messageFromPC
-    
-    strtokIndx = strtok(NULL, ",");
-    newBPM = atoi(strtokIndx);     // convert this part to an int
- 
-    strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
-    TimeLine = atoi(strtokIndx);     // convert this part to an integer
-
-    strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
-    BigSky = atoi(strtokIndx);     // convert this part to an integer
-}
-
-//============
-
-void showParsedData() {
-    Serial.print("Song ");
-    Serial.println(Song);
-    Serial.print("BPM ");
-    Serial.println(newBPM);
-    Serial.print("TimeLine ");
-    Serial.println(newTimeLine);
-    Serial.print("BigSky ");
-    Serial.println(BigSky);
 }
