@@ -1,4 +1,6 @@
 #include <TimerOne.h>        // 16 bit counter with uS resolution
+#include "LPD8806.h"
+#include "SPI.h"
 
 const byte numChars = 32;
 char receivedChars[numChars];
@@ -20,8 +22,11 @@ char tempString[10]; // for sprintf
 char songstuff[4][32];
 int programStarted = 0;
 boolean serialEnabled = false; 
-
 boolean newData = false;
+int nLEDs = 60;
+LPD8806 strip = LPD8806(nLEDs);
+float beat =  60000000/BPM;
+int lit = 0;
 
 
 
@@ -29,11 +34,26 @@ void MIDI_CLOCK() // ISR: send MIDI CLock
 {
   Serial1.write(0xF8);
 }
+
+void lightsOn(){
+  int i;
+  for (i=0; i < strip.numPixels(); i++) {
+     strip.setPixelColor(i, strip.Color (0, 15, 0));
+     strip.show();}
+}
+
+void lightsOff(){
+  int i;
+  for (i=0; i < strip.numPixels(); i++) {
+     strip.setPixelColor(i, 0);
+     strip.show();}
+}
   
 void setNewBPM(){
   BPM = newBPM;
   PERIOD = 2.5e6 / BPM;  // period in microseconds, 24x beat clock
   Timer1.initialize(PERIOD);
+  beat =  60000000/BPM;
 }
 
 void setNewTimeLine(){
@@ -95,8 +115,6 @@ void setNewBigSky(){
   BigSky = newBigSky;
 }
 
-//============
-
 void setup() {
     
     Serial.begin(115200);  // serial monitor
@@ -107,32 +125,46 @@ void setup() {
     Timer1.initialize(PERIOD);
     //Timer1.attachInterrupt( MIDI_CLOCK ); // set interrupt handle
     pinMode(startPedaling, INPUT);
+    // start the led strip
+    strip.begin();
+    strip.show();
 }
-
-
-//============
 
 void loop() {
     Timer1.attachInterrupt( MIDI_CLOCK );  // enable interrupt, set handler
-    //static uint32_t lasttime;
-    //uint32_t currtime = micros();
 
-     //if (currtime - lasttime >= PERIOD)
-     //{
-        //MIDI_CLOCK();
-        //lasttime = currtime;
-     //}
-     
     if ((programStarted == LOW)){
       programStarted = digitalRead(startPedaling);    
      }
 
 
-     if ((programStarted == HIGH) && (serialEnabled == false)){
+    if ((programStarted == HIGH) && (serialEnabled == false)){
           Serial2.begin(9600);
           Serial2.setTimeout(200);
           serialEnabled = true;
      }
+
+    
+    static uint32_t oldTime;
+    uint32_t currtime = micros();
+
+     if (currtime > oldTime && !lit){
+        lightsOn();
+        lit=1;
+        oldTime = currtime + (beat/3);
+     }
+     else if (currtime > oldTime && lit){
+        lightsOff();
+        lit=0;
+        oldTime = currtime + ((2*beat)/3);
+     }
+     
+     //{
+        //MIDI_CLOCK();
+        //lasttime = currtime;
+     //}*/
+     
+
 
      int len = Serial2.available();
      if (len){
@@ -155,7 +187,7 @@ void loop() {
         }
         
         strcpy(Song, songstuff[0]);          // copy it to messageFromPC
-        newBPM = atof(songstuff[1]);     // convert this part to an int
+        newBPM = atof(songstuff[1]);     // convert this part to an float
         newTimeLine = atoi(songstuff[2]);     // convert this part to an integer
         newBigSky = atoi(songstuff[3]);     // convert this part to an integer
 
