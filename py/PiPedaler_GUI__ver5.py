@@ -103,8 +103,10 @@ class GUI(Frame):
             self.listbox.activate(self.listbox.curselection())
             current_index = self.listbox.index(ACTIVE)
             self.listbox.get(self.listbox.curselection())
+            self.currentbpm=(songList[current_index].bpm)
+            pwm.ChangeFrequency(1/(60.0/self.currentbpm))
             self.CBPM.configure(text="Current BPM: {}".format(songList[current_index].bpm), fg="black")
-
+            self.serialize()
             
         self.listbox.bind('<<ListboxSelect>>', touchSelect)        
 
@@ -223,14 +225,12 @@ try:
         # infinite loop listening for user input
         while 1:
                 window.update()
-                if (time.clock()-debounceClock > .24):
+                if (time.clock()-debounceClock > .25):
                         debounce = 0
                 b = GPIO.input(tap) # button state
                 c = GPIO.input(nextSong) # button state
                 d = GPIO.input(lastSong) # button state 
-                if(b == GPIO.HIGH and not bpmtoggle and debounce==0):
-                        debounceClock = time.clock()
-                        debounce = 1
+                if(b == GPIO.HIGH and not bpmtoggle):
                         bpmtoggle = True
                         currbpm = time.clock()
                         
