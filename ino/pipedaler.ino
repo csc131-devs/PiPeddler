@@ -123,7 +123,6 @@ void setup() {
 
     PERIOD = 2.5e6 / BPM;  // period in microseconds, 24x beat clock
     Timer1.initialize(PERIOD);
-    //Timer1.attachInterrupt( MIDI_CLOCK ); // set interrupt handle
     pinMode(startPedaling, INPUT);
     // start the led strip
     strip.begin();
@@ -159,23 +158,12 @@ void loop() {
         oldTime = currtime + ((2*beat)/3);
      }
      
-     //{
-        //MIDI_CLOCK();
-        //lasttime = currtime;
-     //}*/
-     
-
 
      int len = Serial2.available();
      if (len){
-//        char* s = malloc(sizeof(char) * (len+1));
-//        for (int i = 0; i < len; ++i){
-//          s[i] = Serial2.read();
-//        }
         String s = Serial2.readString();
         char buf[64];
         s.toCharArray(buf, sizeof(buf));
-     //Serial.print(s);
 
         char *p = buf;
         char *str;
@@ -183,7 +171,6 @@ void loop() {
         {
           str = strtok_r(p, ",", &p);
           strcpy(songstuff[i], str);
-          //Serial.println(str);
         }
         
         strcpy(Song, songstuff[0]);          // copy it to messageFromPC
